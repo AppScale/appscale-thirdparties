@@ -1,0 +1,33 @@
+# /etc/systemd/system/foundationdb.service
+[Unit]
+Description=FoundationDB Service
+AssertPathIsDirectory=/var/run/foundationdb
+AssertPathExists=/etc/foundationdb/foundationdb.conf
+AssertPathExists=/etc/foundationdb/fdb.cluster
+After=syslog.target network.target remote-fs.target nss-lookup.target
+RequiresMountsFor=${DATA_DIRS}
+
+[Service]
+User=foundationdb
+Group=foundationdb
+PIDFile=/var/run/foundationdb/fdbmonitor.pid
+
+Restart=always
+RestartSec=5
+
+ExecStart=/usr/lib/foundationdb/fdbmonitor --lockfile /var/run/foundationdb/fdbmonitor.pid --conffile /etc/foundationdb/foundationdb.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s QUIT $MAINPID
+
+#MemoryLow=${MEMORY_LOW}
+#MemoryHigh=${MEMORY_HIGH}    IS NOT SUPPORTED IN cgroup-v1
+#MemoryMax=${MEMORY_MAX}
+MemoryLimit=${MEMORY_MAX}
+
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+#IOAccounting=yes
+
+[Install]
+WantedBy=multi-user.target
