@@ -5,86 +5,6 @@
 set -e
 set -u
 
-############################
-### Arguments processing ###
-############################
-
-usage() {
-    echo "Usage: ${0} \\"
-    echo "         --cluster-file-content <STR> --host-to-listen-on <HOST> \\"
-    echo "         [--server-processes-num <NUM>] [--data-dir <PATH>] \\"
-    echo "         [--fdbcli-command <COMMAND>]"
-    echo
-    echo "Options:"
-    echo "   --cluster-file-content <STR>  fdb.cluster file content."
-    echo "   --host-to-listen-on <HOST>    Host name or IP to listen on."
-    echo "   --server-processes-num <NUM>  Number of server processes to start "
-    echo "                                 (it shouldn't be greater than number of CPUs, default: 2)."
-    echo "   --data-dir <PATH>             FDB data dir path (default: /var/lib/foundationdb/data/)."
-    echo "   --fdbcli-command <COMMAND>    fdbcli command to execute after cluster initialization."
-    exit 1
-}
-
-CLUSTER_FILE_CONTENT=
-HOST_TO_LISTEN_ON=
-SERVER_PROCESSES_NUM=2
-DATA_DIR=/var/lib/foundationdb/data/
-FDBCLI_COMMAND=
-
-# Let's get the command line arguments.
-while [ $# -gt 0 ]; do
-    if [ "${1}" = "--cluster-file-content" ]; then
-        shift
-        if [ -z "${1}" ]; then
-            usage
-        fi
-        CLUSTER_FILE_CONTENT="${1}"
-        shift
-        continue
-    fi
-    if [ "${1}" = "--host-to-listen-on" ]; then
-        shift
-        if [ -z "${1}" ]; then
-            usage
-        fi
-        HOST_TO_LISTEN_ON="${1}"
-        shift
-        continue
-    fi
-    if [ "${1}" = "--server-processes-num" ]; then
-        shift
-        if [ -z "${1}" ]; then
-            usage
-        fi
-        SERVER_PROCESSES_NUM="${1}"
-        shift
-        continue
-    fi
-    if [ "${1}" = "--data-dir" ]; then
-        shift
-        if [ -z "${1}" ]; then
-            usage
-        fi
-        DATA_DIR="${1}"
-        shift
-        continue
-    fi
-    if [ "${1}" = "--fdbcli-command" ]; then
-        shift
-        if [ -z "${1}" ]; then
-            usage
-        fi
-        FDBCLI_COMMAND="${1}"
-        shift
-        continue
-    fi
-    usage
-done
-
-if [ -z "${CLUSTER_FILE_CONTENT}" ] || [ -z "${HOST_TO_LISTEN_ON}" ]; then
-    usage
-fi
-
 
 ########################
 ### Helper functions ###
@@ -130,6 +50,88 @@ cachepackage() {
     fi
 }
 
+############################
+### Arguments processing ###
+############################
+
+usage() {
+    echo "Usage: ${0} \\"
+    echo "         --cluster-file-content <STR> --host-to-listen-on <HOST> \\"
+    echo "         [--data-dir <PATH>] [--fdbcli-command <COMMAND>]"
+    echo
+    echo "Options:"
+    echo "   --cluster-file-content <STR>  fdb.cluster file content."
+    echo "   --host-to-listen-on <HOST>    Host name or IP to listen on."
+    echo "   --data-dir <PATH>             FDB data dir path (default: /var/lib/foundationdb/data/)."
+    echo "   --fdbcli-command <COMMAND>    fdbcli command to execute after cluster initialization."
+    exit 1
+}
+
+CLUSTER_FILE_CONTENT=
+HOST_TO_LISTEN_ON=
+DATA_DIR=/var/lib/foundationdb/data/
+FDBCLI_COMMAND=
+
+# Let's get the command line arguments.
+while [ $# -gt 0 ]; do
+    if [ "${1}" = "--cluster-file-content" ]; then
+        shift
+        if [ -z "${1}" ]; then
+            usage
+        fi
+        CLUSTER_FILE_CONTENT="${1}"
+        shift
+        continue
+    fi
+    if [ "${1}" = "--host-to-listen-on" ]; then
+        shift
+        if [ -z "${1}" ]; then
+            usage
+        fi
+        HOST_TO_LISTEN_ON="${1}"
+        shift
+        continue
+    fi
+    if [ "${1}" = "--data-dir" ]; then
+        shift
+        if [ -z "${1}" ]; then
+            usage
+        fi
+        DATA_DIR="${1}"
+        shift
+        continue
+    fi
+    if [ "${1}" = "--fdbcli-command" ]; then
+        shift
+        if [ -z "${1}" ]; then
+            usage
+        fi
+        FDBCLI_COMMAND="${1}"
+        shift
+        continue
+    fi
+    usage
+done
+
+if [ -z "${CLUSTER_FILE_CONTENT}" ] || [ -z "${HOST_TO_LISTEN_ON}" ]; then
+    usage
+fi
+
+CLUSTER_SERVERS=$(echo "${CLUSTER_FILE_CONTENT}" | awk -F '@' '{ print $2 }' | tr '\r\n' ' ' | sed 's/,/ /g' )
+HOST_SERVER_IDS=
+for server_address in ${CLUSTER_SERVERS} ; do
+  host=$(echo "${server_address}" | awk -F ':' '{ print $1 }')
+  port=$(echo "${server_address}" | awk -F ':' '{ print $2 }')
+  if [ "${host}" = "${HOST_TO_LISTEN_ON}" ] ; then
+    HOST_SERVER_IDS+="${port} "
+  fi
+done
+
+if [ -z "${HOST_SERVER_IDS}" ] ; then
+  log "Cluster file doesn't declare any servers for a current host (${HOST_TO_LISTEN_ON})"
+  log 'No FDB servers will be started on the current host' 'WARNING'
+fi
+
 
 #####################################
 ### Actual installation procedure ###
@@ -165,14 +167,13 @@ dpkg --install ${APT_CACHE}/foundationdb-server_6.1.8-1_amd64.deb
 log 'Making sure init.d does not manage FoundationDB'
 /etc/init.d/foundationdb stop
 update-rc.d foundationdb disable
-# rm /etc/init.d/foundationdb
 
 
 ### Ensuring FDB directories are accessible ###
 #---------------------------------------------#
 log 'Making sure FDB directories are created and are owned by foundationdb user.'
-mkdir -pv /var/run/foundationdb
-chown foundationdb:foundationdb /var/run/foundationdb
+mkdir -pv /run/foundationdb
+chown foundationdb:foundationdb /run/foundationdb
 mkdir -pv /var/log/foundationdb
 chown -R foundationdb:foundationdb /var/log/foundationdb
 mkdir -pv "${DATA_DIR}"
@@ -186,7 +187,7 @@ log "Filling ${CLUSTER_FILE} file"
 if [ -f "${CLUSTER_FILE}" ]; then
   cp ${CLUSTER_FILE} "${CLUSTER_FILE}.$(date +'%Y-%m-%d_%H-%M-%S')"
 fi
-echo "${CLUSTER_FILE_CONTENT}" > /etc/foundationdb/fdb.cluster
+echo "${CLUSTER_FILE_CONTENT}" > "${CLUSTER_FILE}"
 
 
 ### Filling /etc/foundationdb/foundationdb.conf ###
@@ -199,12 +200,23 @@ fi
 export HOST_TO_LISTEN_ON
 export DATA_DIR
 export FDB_SERVERS=$(
-  for server_id in $(seq 4500 $((4500 + SERVER_PROCESSES_NUM - 1))); do
+  for server_id in ${HOST_SERVER_IDS}; do
     echo "[fdbserver.${server_id}]"
   done
 )
 envsubst '$HOST_TO_LISTEN_ON $DATA_DIR $FDB_SERVERS'\
  < "${SCRIPT_DIR}/foundationdb.conf" > "${CONF_FILE}"
+
+
+### Filling /usr/lib/tmpfiles.d/foundationdb.conf ###
+#-------------------------------------------#
+TMPFILES_CONF_FILE=/usr/lib/tmpfiles.d/foundationdb.conf
+log "Filling ${TMPFILES_CONF_FILE} file"
+if [ -f "${TMPFILES_CONF_FILE}" ]; then
+  cp ${TMPFILES_CONF_FILE} "${TMPFILES_CONF_FILE}.$(date +'%Y-%m-%d_%H-%M-%S')"
+fi
+echo "r! /run/foundationdb/fdbmonitor.pid" > "${TMPFILES_CONF_FILE}"
+echo "d /run/foundationdb 0744 foundationdb foundationdb" >> "${TMPFILES_CONF_FILE}"
 
 
 ### Defining systemd service ###
@@ -215,22 +227,27 @@ log "Filling ${UNIT_FILE} file"
 if [ -f "${UNIT_FILE}" ]; then
   cp ${UNIT_FILE} "${UNIT_FILE}.$(date +'%Y-%m-%d_%H-%M-%S')"
 fi
-# Give FDB processes at most half of total memory (kill if greater).
-TOTAL_MEM_KB=$(awk '/MemTotal/ { print $2 }' /proc/meminfo)
-FDB_MEM_MAX=$(echo "$TOTAL_MEM_KB" | awk '{ printf "%d", $1 * 0.9 / 1024 }')
-DATA_DIRS=''
-for server_id in $(seq 4500 $((4500 + SERVER_PROCESSES_NUM - 1))); do
-  DATA_DIRS="${DATA_DIRS}${DATA_DIR}/${server_id} "
-done
-export MEMORY_MAX="${FDB_MEM_MAX}M"
-export DATA_DIRS
-envsubst '$DATA_DIRS $SERVER_PROCESSES_NUM $MEMORY_MAX'\
- < "${SCRIPT_DIR}/foundationdb.service" > "${UNIT_FILE}"
+envsubst < "${SCRIPT_DIR}/foundationdb.service" > "${UNIT_FILE}"
 
 systemctl daemon-reload
 systemctl enable foundationdb.service
 systemctl restart foundationdb.service
 systemctl status foundationdb.service
+
+
+log 'Waiting for FDB cluster to start'
+wait_start=$(date +%s)
+while ! fdbcli --exec status
+do
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - wait_start))
+    if [ "${elapsed_time}" -gt 60 ] ; then
+        log 'Timed out waiting for FDB cluster to start' 'ERROR'
+        exit 1
+    fi
+    sleep 5
+done
+
 
 if [ ! -z "${FDBCLI_COMMAND}" ]; then
   log "Running fdbcli command: \`${FDBCLI_COMMAND}\`"
