@@ -2,8 +2,7 @@
 # init-foundationdb.sh script ensures that FoundationDB server
 # is installed and configured on the machine.
 
-set -e
-set -u
+set -eu
 
 
 ########################
@@ -162,18 +161,9 @@ log "Installing ${FDB_SERVER_PKG}"
 dpkg --install ${APT_CACHE}/foundationdb-server_6.1.8-1_amd64.deb
 
 
-### Getting rid of init.d management ###
-#--------------------------------------#
-log 'Making sure init.d does not manage FoundationDB'
-/etc/init.d/foundationdb stop
-update-rc.d foundationdb disable
-
-
 ### Ensuring FDB directories are accessible ###
 #---------------------------------------------#
 log 'Making sure FDB directories are created and are owned by foundationdb user.'
-mkdir -pv /run/foundationdb
-chown foundationdb:foundationdb /run/foundationdb
 mkdir -pv /var/log/foundationdb
 chown -R foundationdb:foundationdb /var/log/foundationdb
 mkdir -pv "${DATA_DIR}"
@@ -208,30 +198,8 @@ envsubst '$HOST_TO_LISTEN_ON $DATA_DIR $FDB_SERVERS'\
  < "${SCRIPT_DIR}/foundationdb.conf" > "${CONF_FILE}"
 
 
-### Filling /usr/lib/tmpfiles.d/foundationdb.conf ###
-#-------------------------------------------#
-TMPFILES_CONF_FILE=/usr/lib/tmpfiles.d/foundationdb.conf
-log "Filling ${TMPFILES_CONF_FILE} file"
-if [ -f "${TMPFILES_CONF_FILE}" ]; then
-  cp ${TMPFILES_CONF_FILE} "${TMPFILES_CONF_FILE}.$(date +'%Y-%m-%d_%H-%M-%S')"
-fi
-echo "r! /run/foundationdb/fdbmonitor.pid" > "${TMPFILES_CONF_FILE}"
-echo "d /run/foundationdb 0744 foundationdb foundationdb" >> "${TMPFILES_CONF_FILE}"
-
-
-### Defining systemd service ###
-#------------------------------#
-log 'Configuring systemd to manage FoundationDB'
-UNIT_FILE=/etc/systemd/system/foundationdb.service
-log "Filling ${UNIT_FILE} file"
-if [ -f "${UNIT_FILE}" ]; then
-  cp ${UNIT_FILE} "${UNIT_FILE}.$(date +'%Y-%m-%d_%H-%M-%S')"
-fi
-envsubst < "${SCRIPT_DIR}/foundationdb.service" > "${UNIT_FILE}"
-
-systemctl daemon-reload
 systemctl enable foundationdb.service
-systemctl restart foundationdb.service
+systemctl start foundationdb.service
 systemctl status foundationdb.service
 
 
