@@ -29,16 +29,16 @@ If you're willing to move another third-party backend provisioning
 from AppScale to this repo you'd need to take in account few notes:
 
  - In order to be able to initialize backend services offline it's highly
-   recommended to have `download_artifacts.sh` script in your backend directory
+   recommended to have `install.sh` script in your backend directory
    (like it's done for `foundationdb`).
    
    AppScale's [bootstrap](http://bootstrap.appscale.com) script prepares
-   appscale images. It runs `download_all_artifacts.sh` which
-   calls all `download_artifacts.sh` scripts found in the repo.
+   appscale images. It runs `install_all.sh` which
+   calls all `install.sh` scripts found in the repo.
   
  - Use or even extend `common.sh` functions.
  
  - Make sure your initialization script is idempotent.
  
-
- 
+ - Make sure you `install.sh` disable installed service (it shouldn't be 
+   running).

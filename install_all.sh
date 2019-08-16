@@ -4,6 +4,6 @@
 
 SCRIPT_DIR="$( realpath --strip "$( dirname "${BASH_SOURCE[0]}" )" )"
 
-for script in $(find "${SCRIPT_DIR}" -name download_artifacts.sh) ; do
+for script in $(find "${SCRIPT_DIR}" -name install.sh) ; do
   bash ${script}
 done
