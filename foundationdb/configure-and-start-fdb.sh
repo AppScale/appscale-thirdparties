@@ -73,13 +73,15 @@ if [ -n "${DATA_DIR}" ]; then
     chown -R foundationdb:foundationdb "${DATA_DIR}"
     PATTERN="^[# ]*datadir *=.*$"
     NEW_CONFIG_LINE="datadir = ${DATA_DIR}/\$ID"
-    sed -i "s%${PATTERN}%${NEW_CONFIG_LINE}%w /tmp/fdbconf-changelog.txt" \
-        /etc/foundationdb/foundationdb.conf
+    sed -i "s%${PATTERN}%${NEW_CONFIG_LINE}%" /etc/foundationdb/foundationdb.conf
 fi
 
 if [ -n "${PUBLIC_ADDRESS}" ]; then
     apt install python
     python /usr/lib/foundationdb/make_public.py -a ${PUBLIC_ADDRESS}
+    PATTERN="^[# ]*public_address *=.*$"
+    NEW_CONFIG_LINE="public_address = ${PUBLIC_ADDRESS}:\$ID"
+    sed -i "s%${PATTERN}%${NEW_CONFIG_LINE}%" /etc/foundationdb/foundationdb.conf
 fi
 
 log 'Making sure FDB directories are created and are owned by foundationdb user.'
