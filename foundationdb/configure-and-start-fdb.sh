@@ -95,14 +95,14 @@ systemctl start foundationdb.service
 systemctl enable foundationdb.service
 systemctl status foundationdb.service
 
-log 'Waiting for FDB cluster to start'
+log 'Waiting for FDB service to start'
 wait_start=$(date +%s)
-while ! fdbcli --exec status | grep -IE 'Coordinators *- *[1-9]'
+while ! systemctl is-active --quiet foundationdb.service
 do
     current_time=$(date +%s)
     elapsed_time=$((current_time - wait_start))
     if [ "${elapsed_time}" -gt 60 ] ; then
-        log 'Timed out waiting for FDB cluster to start' 'ERROR'
+        log 'Timed out waiting for FDB service to start' 'ERROR'
         exit 1
     fi
     sleep 5
