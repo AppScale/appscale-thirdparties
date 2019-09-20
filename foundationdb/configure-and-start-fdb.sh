@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# init-foundationdb.sh script ensures that FoundationDB server
+# This script ensures that FoundationDB server
 # is installed and configured on the machine.
 
 set -eu
@@ -94,19 +94,6 @@ chown -R foundationdb:foundationdb /var/log/foundationdb
 systemctl start foundationdb.service
 systemctl enable foundationdb.service
 systemctl status foundationdb.service
-
-log 'Waiting for FDB service to start'
-wait_start=$(date +%s)
-while ! systemctl is-active --quiet foundationdb.service
-do
-    current_time=$(date +%s)
-    elapsed_time=$((current_time - wait_start))
-    if [ "${elapsed_time}" -gt 60 ] ; then
-        log 'Timed out waiting for FDB service to start' 'ERROR'
-        exit 1
-    fi
-    sleep 5
-done
 
 if [ ! -z "${FDBCLI_COMMAND}" ]; then
   log "Running fdbcli command: \`${FDBCLI_COMMAND}\`"

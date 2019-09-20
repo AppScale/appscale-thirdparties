@@ -4,6 +4,6 @@
 
 SCRIPT_DIR="$( realpath --strip "$( dirname "${BASH_SOURCE[0]}" )" )"
 
-for script in $(find "${SCRIPT_DIR}" -name install.sh) ; do
+for script in "${SCRIPT_DIR}"/*/install.sh ; do
   bash ${script}
 done
