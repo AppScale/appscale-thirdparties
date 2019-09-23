@@ -15,14 +15,13 @@ source "$(dirname ${SCRIPT_DIR})/common.sh"
 
 usage() {
     echo "Usage: ${0} --host <HOST> --dbname <DBNAME> --username <USERNAME> \\"
-    echo "            --password <USER_PWD> [--data-dir <PATH>]"
+    echo "            --password <USER_PWD>"
     echo
     echo "Options:"
     echo "   --host <HOST>          Host IP to accept connections on"
     echo "   --dbname <DBNAME>      Database name to create"
     echo "   --username <USERNAME>  Role name to create"
     echo "   --password <USER_PWD>  Password to use for new user"
-    echo "   --data-dir <PATH>      Postgres data dir path (default: Postgres default)."
     exit 1
 }
 
@@ -30,7 +29,6 @@ HOST=
 DBNAME=
 USERNAME=
 PASSWORD=
-DATA_DIR=
 
 # Let's get the command line arguments.
 while [ $# -gt 0 ]; do
@@ -52,11 +50,6 @@ while [ $# -gt 0 ]; do
     if [ "${1}" = "--password" ]; then
         shift; if [ -z "${1:-}" ]; then usage; fi
         PASSWORD="${1}"
-        shift; continue
-    fi
-    if [ "${1}" = "--data-dir" ]; then
-        shift; if [ -z "${1:-}" ]; then usage; fi
-        DATA_DIR="${1}"
         shift; continue
     fi
     echo -e "\nParameter '${1}' is not recognized\n"
@@ -93,16 +86,6 @@ then
     sed -i "s/^listen_addresses *=.*/listen_addresses = 'localhost,${HOST}'/" "${PG_CONF}"
 else
     echo "listen_addresses = 'localhost,${HOST}'" >> "${PG_CONF}"
-fi
-
-# Configure postgres to use specific data directory
-if [ -n "${DATA_DIR}" ]; then
-    if grep -q -E "^data_directory *=" "${PG_CONF}"
-    then
-        sed -i "s/^data_directory *=.*/data_directory = '${DATA_DIR}'/" "${PG_CONF}"
-    else
-        echo "data_directory = '${DATA_DIR}'" >> "${PG_CONF}"
-    fi
 fi
 
 # Allow host connections to the specified DB
