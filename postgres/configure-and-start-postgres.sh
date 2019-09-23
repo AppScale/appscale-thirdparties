@@ -9,16 +9,13 @@ set -eu
 SCRIPT_DIR="$( realpath --strip "$( dirname "${BASH_SOURCE[0]}" )" )"
 source "$(dirname ${SCRIPT_DIR})/common.sh"
 
-set -e
-set -u
-
 ############################
 ### Arguments processing ###
 ############################
 
 usage() {
     echo "Usage: ${0} --host <HOST> --dbname <DBNAME> --username <USERNAME> \\"
-    echo "            --password <USER_PWD> --data-dir <PATH>"
+    echo "            --password <USER_PWD> [--data-dir <PATH>]"
     echo
     echo "Options:"
     echo "   --host <HOST>          Host IP to accept connections on"
@@ -38,31 +35,31 @@ DATA_DIR=
 # Let's get the command line arguments.
 while [ $# -gt 0 ]; do
     if [ "${1}" = "--host" ]; then
-        shift; if [ -z "${1}" ]; then usage; fi
+        shift; if [ -z "${1:-}" ]; then usage; fi
         HOST="${1}"
         shift; continue
     fi
     if [ "${1}" = "--dbname" ]; then
-        shift; if [ -z "${1}" ]; then usage; fi
+        shift; if [ -z "${1:-}" ]; then usage; fi
         DBNAME="${1}"
         shift; continue
     fi
     if [ "${1}" = "--username" ]; then
-        shift; if [ -z "${1}" ]; then usage; fi
+        shift; if [ -z "${1:-}" ]; then usage; fi
         USERNAME="${1}"
         shift; continue
     fi
     if [ "${1}" = "--password" ]; then
-        shift; if [ -z "${1}" ]; then usage; fi
+        shift; if [ -z "${1:-}" ]; then usage; fi
         PASSWORD="${1}"
         shift; continue
     fi
     if [ "${1}" = "--data-dir" ]; then
-        shift; if [ -z "${1}" ]; then usage; fi
+        shift; if [ -z "${1:-}" ]; then usage; fi
         DATA_DIR="${1}"
         shift; continue
     fi
-    echo -e "\nParameter '$1' is not recognized\n"
+    echo -e "\nParameter '${1}' is not recognized\n"
     usage
 done
 
@@ -81,7 +78,7 @@ log "Updating Postgres configs to accept host connections to the Database"
 PG_MAJOR_VER=$(psql --version | awk '{ print $3 }' | awk -F '.' '{ print $1 }')
 PG_VERSION=$(psql --version | awk '{ print $3 }' | awk -F '.' '{ print $1 "." $2 }')
 
-if [ "${PG_MAJOR_VER}" = "10" ]; then
+if (( "${PG_MAJOR_VER}" >= 10 )); then
     PG_CONFIG_DIR="/etc/postgresql/${PG_MAJOR_VER}"
 else
     PG_CONFIG_DIR="/etc/postgresql/${PG_VERSION}"
@@ -111,9 +108,9 @@ fi
 # Allow host connections to the specified DB
 if grep -q -E "^host[ \t]+${DBNAME}[ \t]+${USERNAME}[ \t]+" "${PG_HBA}"
 then
-    sed -i "s|^host[ \t]+${DBNAME}[ \t]+${USERNAME}[ \t]+.*|host ${DBNAME} ${USERNAME} ${HOST}/0 md5|" "${PG_HBA}"
+    sed -i "s|^host[ \t]+${DBNAME}[ \t]+${USERNAME}[ \t]+.*|host ${DBNAME} ${USERNAME} 0.0.0.0/0 md5|" "${PG_HBA}"
 else
-    echo "host ${DBNAME} ${USERNAME} ${HOST}/0 md5" >> "${PG_HBA}"
+    echo "host ${DBNAME} ${USERNAME} 0.0.0.0/0 md5" >> "${PG_HBA}"
 fi
 
 systemctl restart postgresql.service

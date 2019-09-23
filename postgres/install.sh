@@ -6,7 +6,7 @@ source "$(dirname ${SCRIPT_DIR})/common.sh"
 
 log "Installing Postgres"
 attempt=1
-while ! (yes | apt-get install postgresql)
+while ! apt-get --assume-yes install postgresql
 do
     if (( attempt > 15 )); then
         log "Failed to install postgresql after ${attempt} attempts" "ERROR"
