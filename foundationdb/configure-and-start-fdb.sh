@@ -66,7 +66,10 @@ done
 
 ### Installing FDB clients package ###
 #------------------------------------#
-${SCRIPT_DIR}/install.sh
+
+if ! (dpkg -l foundationdb-server && dpkg -l foundationdb-clients) > /dev/null 2>&1; then
+    ${SCRIPT_DIR}/install.sh
+fi
 
 if [ -n "${DATA_DIR}" ]; then
     mkdir -pv "${DATA_DIR}"
@@ -77,8 +80,14 @@ if [ -n "${DATA_DIR}" ]; then
 fi
 
 if [ -n "${PUBLIC_ADDRESS}" ]; then
-    apt install python
-    python /usr/lib/foundationdb/make_public.py -a ${PUBLIC_ADDRESS}
+    apt-get --assume-yes install python
+    if ! python /usr/lib/foundationdb/make_public.py -a ${PUBLIC_ADDRESS}; then
+        if ! grep -E "[^0-9]${PUBLIC_ADDRESS}:" /etc/foundationdb/fdb.cluster; then
+            fdb_cluster=$(cat /etc/foundationdb/fdb.cluster)
+            log "Can't use public address ${PUBLIC_ADDRESS} with fdb.cluster: '${fdb_cluster}'" "ERROR"
+            exit 1
+        fi
+    fi
     PATTERN="^[# ]*public_address *=.*$"
     NEW_CONFIG_LINE="public_address = ${PUBLIC_ADDRESS}:\$ID"
     sed -i "s%${PATTERN}%${NEW_CONFIG_LINE}%" /etc/foundationdb/foundationdb.conf

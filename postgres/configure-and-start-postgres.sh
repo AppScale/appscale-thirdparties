@@ -65,7 +65,9 @@ fi
 ### Actual installation procedure ###
 #####################################
 
-${SCRIPT_DIR}/install.sh
+if ! dpkg -l postgresql > /dev/null 2>&1; then
+    ${SCRIPT_DIR}/install.sh
+fi
 
 log "Updating Postgres configs to accept host connections to the Database"
 PG_MAJOR_VER=$(psql --version | awk '{ print $3 }' | awk -F '.' '{ print $1 }')
@@ -101,6 +103,7 @@ systemctl enable postgresql.service
 systemctl status postgresql.service
 
 
+trap 'rm -f ~/.pgpass' EXIT
 echo "${HOST}:5432:${DBNAME}:${USERNAME}:${PASSWORD}" > ~/.pgpass
 chmod 600 ~/.pgpass
 
@@ -108,11 +111,8 @@ log "Checking if DB and user already exist"
 if psql --dbname ${DBNAME} --username ${USERNAME} --host ${HOST} \
         --command 'SELECT current_timestamp;'
 then
-    rm ~/.pgpass
     log "DB and user are already configured"
     exit 0
-else
-    rm ~/.pgpass
 fi
 
 
