@@ -31,5 +31,5 @@ do
 done
 
 log "Disabling Postgres service for now"
-systemctl disable postgresql.service
-systemctl stop postgresql.service
+systemctl disable postgresql.service || true
+systemctl stop postgresql.service || true

@@ -102,7 +102,7 @@ chown -R foundationdb:foundationdb /var/log/foundationdb
 #------------------------------------------------#
 systemctl start foundationdb.service
 systemctl enable foundationdb.service
-systemctl status foundationdb.service
+systemctl --no-pager status foundationdb.service
 
 if [ ! -z "${FDBCLI_COMMAND}" ]; then
   log "Running fdbcli command: \`${FDBCLI_COMMAND}\`"

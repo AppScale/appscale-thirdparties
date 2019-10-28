@@ -100,7 +100,7 @@ fi
 
 systemctl restart postgresql.service
 systemctl enable postgresql.service
-systemctl status postgresql.service
+systemctl --no-pager status postgresql.service
 
 
 trap 'rm -f ~/.pgpass' EXIT
